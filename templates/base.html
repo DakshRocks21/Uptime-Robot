@@ -38,12 +38,13 @@
                 </div>
             </div>
             <div class="relative">
-                <button onclick="toggleJsonDropdown()" class="text-white text-lg">Manage JSON ▼</button>
+                <button onclick="toggleJsonDropdown()" class="text-white text-lg">Manage Data ▼</button>
                 <div id="json-dropdown" class="absolute right-0 mt-2 py-2 w-48 bg-white rounded-lg shadow-xl hidden">
                     <a href="{{ url_for('dump_json') }}"
-                        class="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white">Download JSON</a>
+                        class="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white">Download Data
+                        (.json)</a>
                     <a href="{{ url_for('upload_page') }}"
-                        class="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white">Upload JSON</a>
+                        class="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white">Upload Custom Data</a>
                 </div>
             </div>
         </div>

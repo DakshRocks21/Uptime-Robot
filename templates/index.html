@@ -3,113 +3,150 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<h1 class="text-3xl font-bold mb-4">Uptime Robot</h1>
+<div class="mx-auto mt-5">
+    <h1 class="text-4xl font-bold mb-8 text-gray-800">Uptime Robot</h1>
 
-<div id="website-form" style="display: none;">
-    <form action="{{ url_for('add_service') }}" method="POST" class="mb-4 p-4 bg-white shadow rounded">
-        <div class="mb-2">
-            <label class="block font-bold">Service Name</label>
-            <input type="text" name="name" class="w-full p-2 border border-gray-300 rounded" required>
-        </div>
-        <div class="mb-2">
-            <label class="block font-bold">URL</label>
-            <input type="url" name="url" class="w-full p-2 border border-gray-300 rounded" required>
-        </div>
-        <div class="mb-2">
-            <label class="block font-bold">Frequency (minutes)</label>
-            <input type="number" name="frequency" class="w-full p-2 border border-gray-300 rounded" required>
-        </div>
-        <div class="mb-2">
-            <label class="block font-bold">Request Type</label>
-            <select name="request_type" class="w-full p-2 border border-gray-300 rounded">
-                <option value="GET">GET</option>
-                <option value="POST">POST</option>
-            </select>
-        </div>
-        <div class="mb-2">
-            <label class="block font-bold">Response Type</label>
-            <select name="response_type" class="w-full p-2 border border-gray-300 rounded">
-                <option value="STATUS CODE">STATUS CODE</option>
-                <option value="JSON">JSON</option>
-                <option value="TEXT">TEXT</option>
-            </select>
-        </div>
-        <div class="mb-2">
-            <label class="block font-bold">Expected Response</label>
-            <input type="text" name="response" class="w-full p-2 border border-gray-300 rounded">
-        </div>
-        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Add Service</button>
-    </form>
-</div>
+    <!-- Website Monitoring Form -->
+    <div id="website-form" class="hidden">
+        <form action="{{ url_for('add_service') }}" method="POST" class="mb-6 p-6 bg-white shadow-md rounded-lg">
+            <h2 class="text-2xl font-semibold mb-4">Add Website Monitoring</h2>
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2">Service Name</label>
+                <input type="text" name="name"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2">URL</label>
+                <input type="url" name="url"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2">Frequency (minutes)</label>
+                <input type="number" name="frequency"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2">Request Type</label>
+                <select name="request_type"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2">Response Type</label>
+                <select name="response_type"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="STATUS CODE">STATUS CODE</option>
+                    <option value="JSON">JSON</option>
+                    <option value="TEXT">TEXT</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2">Expected Response</label>
+                <input type="text" name="response"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <button type="submit"
+                class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                Add Service
+            </button>
+        </form>
+    </div>
 
-<div id="port-form" style="display: none;">
-    <form action="{{ url_for('add_service') }}" method="POST" class="mb-4 p-4 bg-white shadow rounded">
-        <div class="mb-2">
-            <label class="block font-bold">Service Name</label>
-            <input type="text" name="name" class="w-full p-2 border border-gray-300 rounded" required>
-        </div>
-        <div class="mb-2">
-            <label class="block font-bold">IP Address/URL</label>
-            <input type="text" name="url" class="w-full p-2 border border-gray-300 rounded" required>
-        </div>
-        <div class="mb-2">
-            <label class="block font-bold">Port</label>
-            <input type="number" name="port" class="w-full p-2 border border-gray-300 rounded" required>
-        </div>
-        <div class="mb-2">
-            <label class="block font-bold">Frequency (minutes)</label>
-            <input type="number" name="frequency" class="w-full p-2 border border-gray-300 rounded" required>
-        </div>
-        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Add Service</button>
-    </form>
-</div>
+    <!-- Port Monitoring Form -->
+    <div id="port-form" class="hidden">
+        <form action="{{ url_for('add_service') }}" method="POST" class="mb-6 p-6 bg-white shadow-md rounded-lg">
+            <h2 class="text-2xl font-semibold mb-4">Add Port Monitoring</h2>
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2">Service Name</label>
+                <input type="text" name="name"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2">IP Address/URL</label>
+                <input type="text" name="url"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2">Port</label>
+                <input type="number" name="port"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700 font-medium mb-2">Frequency (minutes)</label>
+                <input type="number" name="frequency"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <button type="submit"
+                class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                Add Service
+            </button>
+        </form>
+    </div>
 
-<div class="bg-white shadow rounded p-4">
-    <h2 class="text-2xl font-bold mb-4">Services</h2>
-    <table class="w-full table-auto">
-        <thead>
-            <tr class="bg-gray-200">
-                <th class="px-4 py-2">Service Name</th>
-                <th class="px-4 py-2">URL/IP:Port</th>
-                <th class="px-4 py-2">Last Checked</th>
-                <th class="px-4 py-2">Status</th>
-                <th class="px-4 py-2">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for service in services %}
-            <tr>
-                <td class="border px-4 py-2">{{ service.name_of_service }}</td>
-                <td class="border px-4 py-2">{{ service.url }}{% if service.port %}:{{ service.port }}{% endif %}</td>
-                <td class="border px-4 py-2">
-                    {% if service.last_checked %}
-                    {{ service.last_checked.strftime('%Y-%m-%d %H:%M:%S') }}
-                    {% else %}
-                    Never
-                    {% endif %}
-                </td>
-                <td class="border px-4 py-2">
-                    {% if service.results %}
-                    {{ service.results[-1].status }}
-                    {% else %}
-                    Unknown
-                    {% endif %}
-                </td>
-                <td class="border px-4 py-2">
-                    <a href="{{ url_for('edit_service', service_id=service.id) }}"
-                        class="bg-yellow-500 text-white px-4 py-2 rounded">Edit</a>
-                    <form action="{{ url_for('delete_service', service_id=service.id) }}" method="POST"
-                        style="display:inline;">
-                        <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded ml-2">Delete</button>
-                    </form>
-                    <form action="{{ url_for('manual_check', service_id=service.id) }}" method="POST"
-                        style="display:inline;">
-                        <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded ml-2">Check Now</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <!-- Services Table -->
+    <div class="bg-white shadow-md rounded-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Services</h2>
+        <table class="w-full table-auto">
+            <thead>
+                <tr class="bg-gray-200 text-gray-700">
+                    <th class="px-6 py-3 text-left text-sm font-medium">Service Name</th>
+                    <th class="px-6 py-3 text-left text-sm font-medium">URL/IP:Port</th>
+                    <th class="px-6 py-3 text-left text-sm font-medium">Last Checked</th>
+                    <th class="px-6 py-3 text-left text-sm font-medium">Status</th>
+                    <th class="px-6 py-3 text-left text-sm font-medium">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for service in services %}
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ service.name_of_service }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ service.url }}{% if service.port %}:{{ service.port }}{%
+                        endif %}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if service.last_checked %}
+                        {{ service.last_checked.strftime('%Y-%m-%d %H:%M:%S') }}
+                        {% else %}
+                        Never
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if service.results %}
+                        <span
+                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ 'bg-green-100 text-green-800' if service.results[-1].status == 'UP' else 'bg-red-100 text-red-800' }}">
+                            {{ service.results[-1].status }}
+                        </span>
+                        {% else %}
+                        <span class="text-gray-500">Unknown</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <a href="{{ url_for('edit_service', service_id=service.id) }}"
+                            class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500">Edit</a>
+                        <form action="{{ url_for('delete_service', service_id=service.id) }}" method="POST"
+                            style="display:inline;">
+                            <button type="submit"
+                                class="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg shadow ml-2 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500">Delete</button>
+                        </form>
+                        <form action="{{ url_for('manual_check', service_id=service.id) }}" method="POST"
+                            style="display:inline;">
+                            <button type="submit"
+                                class="bg-green-500 text-white font-semibold py-2 px-4 rounded-lg shadow ml-2 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">Check
+                                Now</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

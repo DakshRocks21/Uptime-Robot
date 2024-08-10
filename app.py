@@ -264,6 +264,20 @@ def dump_json():
         mimetype='application/json',
         headers={"Content-Disposition": "attachment;filename=services.json"}
     )
+def convert_dates(service):
+    date_fields = ['date_added', 'last_checked']
+    result_date_fields = ['time', 'next_check']
+
+    for field in date_fields:
+        if field in service and isinstance(service[field], str):
+            service[field] = datetime.datetime.fromisoformat(service[field])
+
+    for result in service.get('results', []):
+        for field in result_date_fields:
+            if field in result and isinstance(result[field], str):
+                result[field] = datetime.datetime.fromisoformat(result[field])
+
+    return service
 
 @app.route('/upload_json', methods=['POST'])
 def upload_json():
@@ -271,6 +285,8 @@ def upload_json():
     if file:
         services_json = json.load(file)
         if isinstance(services_json, list):
+            services_json = [convert_dates(service) for service in services_json]
+
             collection.delete_many({})  # Clear the existing data
             collection.insert_many(services_json)
             flash('JSON data uploaded successfully!', 'success')

@@ -3,64 +3,80 @@
 {% block title %}Event Viewer{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-4">
-    <h1 class="text-3xl font-bold">Event Viewer</h1>
+<div class="mx-auto mt-5">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-4xl font-bold text-gray-800">Event Viewer</h1>
 
-    <form action="{{ url_for('clear_history') }}" method="POST">
-        <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded">Clear History</button>
+        <form action="{{ url_for('clear_history') }}" method="POST">
+            <button type="submit"
+                class="bg-red-600 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                Clear History
+            </button>
+        </form>
+    </div>
+
+    <form method="POST" class="mb-8 p-6 bg-white shadow-md rounded-lg">
+        <div class="flex items-end space-x-6">
+            <div class="w-1/2">
+                <label class="block text-gray-700 font-medium mb-2" for="start_time">Start Time</label>
+                <input type="datetime-local" name="start_time" id="start_time" value="{{ start_time.isoformat() }}"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="w-1/2">
+                <label class="block text-gray-700 font-medium mb-2" for="end_time">End Time</label>
+                <input type="datetime-local" name="end_time" id="end_time" value="{{ end_time.isoformat() }}"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <button type="submit"
+                    class="bg-blue-600 text-white font-semibold px-5 py-2 h-12 rounded-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    Filter
+                </button>
+            </div>
+        </div>
     </form>
-</div>
 
-<form method="POST" class="mb-4 p-4 bg-white shadow rounded">
-    <div class="flex items-end space-x-4">
-        <div class="w-1/2">
-            <label class="block text-gray-700 font-bold mb-2" for="start_time">Start Time</label>
-            <input type="datetime-local" name="start_time" id="start_time" value="{{ start_time.isoformat() }}"
-                class="w-full p-2 border border-gray-300 rounded">
+    <div class="bg-white shadow-md rounded-lg p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl font-bold text-gray-800">Filtered Events</h2>
+            <a href="{{ url_for('events') }}" class="text-blue-600 font-semibold hover:underline">
+                X Remove Filters
+            </a>
         </div>
-        <div class="w-1/2">
-            <label class="block text-gray-700 font-bold mb-2" for="end_time">End Time</label>
-            <input type="datetime-local" name="end_time" id="end_time" value="{{ end_time.isoformat() }}"
-                class="w-full p-2 border border-gray-300 rounded">
-        </div>
-        <div>
-            <button type="submit" class="bg-blue-500 text-white px-4 py-2 h-11 rounded">Filter</button>
-        </div>
-    </div>
-</form>
 
-<div class="bg-white shadow rounded p-4 bg-black">
-    <div class="flex justify-between items-center mb-4">
-        <h2 class="text-2xl font-bold inline-block text-center">Filtered Events</h2>
-        <a href="{{ url_for('events') }}" class="text-blue-700 px-1 py-2 rounded inline-block text-center">X
-            Remove
-            Filters</a>
+        {% if events %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full table-auto">
+                <thead>
+                    <tr class="bg-gray-200 text-gray-700">
+                        <th class="px-6 py-3 text-left text-sm font-medium">Time</th>
+                        <th class="px-6 py-3 text-left text-sm font-medium">Service Name</th>
+                        <th class="px-6 py-3 text-left text-sm font-medium">URL/IP</th>
+                        <th class="px-6 py-3 text-left text-sm font-medium">Status</th>
+                        <th class="px-6 py-3 text-left text-sm font-medium">Response</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for event in events %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap">{{ event.time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">{{ event.service_name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">{{ event.url_pinged }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span
+                                class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ 'bg-green-100 text-green-800' if event.status == 'UP' else 'bg-red-100 text-red-800' }}">
+                                {{ event.status }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">{{ event.response }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-center text-gray-600 mt-4">No event history available for the selected time range.</p>
+        {% endif %}
     </div>
-    {% if events %}
-    <table class="w-full table-auto">
-        <thead>
-            <tr class="bg-gray-200">
-                <th class="px-4 py-2">Time</th>
-                <th class="px-4 py-2">Service Name</th>
-                <th class="px-4 py-2">URL/IP</th>
-                <th class="px-4 py-2">Status</th>
-                <th class="px-4 py-2">Response</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for event in events %}
-            <tr>
-                <td class="border px-4 py-2">{{ event.time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                <td class="border px-4 py-2">{{ event.service_name }}</td>
-                <td class="border px-4 py-2">{{ event.url_pinged }}</td>
-                <td class="border px-4 py-2">{{ event.status }}</td>
-                <td class="border px-4 py-2">{{ event.response }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="text-center text-gray-600">No event history available for the selected time range.</p>
-    {% endif %}
 </div>
 {% endblock %}
