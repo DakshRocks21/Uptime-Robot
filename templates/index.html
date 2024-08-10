@@ -13,17 +13,17 @@
         <h1 class="text-3xl font-bold mb-4">Uptime Robot</h1>
 
         <form action="{{ url_for('add_service') }}" method="POST" class="mb-4 p-4 bg-white shadow rounded">
-            <div class="mb-2 bg-red-50">
+            <div class="mb-2">
                 <label class="block font-bold">Service Name</label>
-                <input type="text" name="name" class="w-full p-2 border border-gray-300 rounded">
+                <input type="text" name="name" class="w-full p-2 border border-gray-300 rounded" required>
             </div>
             <div class="mb-2">
                 <label class="block font-bold">URL</label>
-                <input type="text" name="url" class="w-full p-2 border border-gray-300 rounded">
+                <input type="url" name="url" class="w-full p-2 border border-gray-300 rounded" required>
             </div>
             <div class="mb-2">
                 <label class="block font-bold">Frequency (minutes)</label>
-                <input type="number" name="frequency" class="w-full p-2 border border-gray-300 rounded">
+                <input type="number" name="frequency" class="w-full p-2 border border-gray-300 rounded" required>
             </div>
             <div class="mb-2">
                 <label class="block font-bold">Request Type</label>
@@ -42,7 +42,7 @@
             </div>
             <div class="mb-2">
                 <label class="block font-bold">Expected Response</label>
-                <input type="text" name="response" class="w-full p-2 border border-gray-300 rounded">
+                <input type="text" name="response" class="w-full p-2 border border-gray-300 rounded" required>
             </div>
             <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Add Service</button>
         </form>
@@ -86,21 +86,26 @@
                                 <button type="submit"
                                     class="bg-red-500 text-white px-4 py-2 rounded ml-2">Delete</button>
                             </form>
+                            <form action="{{ url_for('manual_check', service_id=service.id) }}" method="POST"
+                                style="display:inline;">
+                                <button type="submit"
+                                    class="bg-green-500 text-white px-4 py-2 rounded ml-2">Check Now</button>
+                            </form>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        <form action="{{ url_for('run_checks') }}" method="GET" class="mt-4">
-            <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded">Run Checks</button>
+        <form action="{{ url_for('manual_run_checks') }}" method="GET" class="mt-4">
+            <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded">Run All Checks Now</button>
         </form>
         <div class="mt-4 p-4 bg-white shadow rounded">
             <h2 class="text-2xl font-bold mb-4">Manage JSON</h2>
             <a href="{{ url_for('dump_json') }}" class="bg-blue-500 text-white px-4 py-2 rounded">Download JSON</a>
 
             <form action="{{ url_for('upload_json') }}" method="POST" enctype="multipart/form-data" class="mt-4">
-                <input type="file" name="file" class="w-full p-2 border border-gray-300 rounded mb-2">
+                <input type="file" name="file" class="w-full p-2 border border-gray-300 rounded mb-2" required>
                 <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Upload JSON</button>
             </form>
         </div>
