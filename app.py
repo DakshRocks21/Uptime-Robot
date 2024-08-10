@@ -6,6 +6,10 @@ import requests
 import json
 import socket
 from apscheduler.schedulers.background import BackgroundScheduler
+from emails import EmailSender
+from dotenv import load_dotenv
+import os
+import random, string
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'  # Required for flash messages
@@ -13,6 +17,18 @@ app.secret_key = 'supersecretkey'  # Required for flash messages
 client = MongoClient('mongodb://localhost:27017/')
 db = client['uptime_robot']
 collection = db['services']
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Email sender setup
+email_sender = EmailSender(
+    smtp_server="smtp.gmail.com",
+    smtp_port=587,
+    username=os.getenv("EMAIL_USER"),
+    password=os.getenv("EMAIL_PASS")
+)
+
 
 # Scheduler
 scheduler = BackgroundScheduler()
@@ -22,6 +38,8 @@ def check_service(service):
     port = service.get('port')  # Retrieve the port if it exists
     request_type = service['request_type']
     expected_response = service['response']
+    
+    result = None
 
     try:
         # Check if port is specified
@@ -30,7 +48,7 @@ def check_service(service):
                 sock.settimeout(10)  # Set timeout to 10 seconds
                 result = sock.connect_ex((url, port))
                 status = "UP" if result == 0 else "DOWN"
-                response = f"Port {port} is {'open' if result == 0 else 'closed'}"
+                response = 'OPEN' if result == 0 else 'CLOSED'
         else:
             # Normal URL check
             if request_type == 'GET':
@@ -44,28 +62,57 @@ def check_service(service):
                 result = response.json()
             else:
                 result = response.text
-
-            status = "UP" if str(result) == str(expected_response) else "DOWN"
-
-        next_check_time = datetime.datetime.now() + datetime.timedelta(minutes=service['frequency'])
-
-        check_result = {
-            "time": datetime.datetime.now(),
-            "response": response if port else result,
-            "url_pinged": f"{url}:{port}" if port else url,
-            "status": status,
-            "next_check": next_check_time  # Ensure next_check is set
-        }
-
-        collection.update_one(
-            {"id": service['id']},
-            {"$set": {"last_checked": datetime.datetime.now()},
-             "$push": {"results": check_result}}
-        )
-        print(f"Service {service['name_of_service']} checked. Status: {status}")
-
     except Exception as e:
         print(f"Error checking service {service['name_of_service']}: {str(e)}")
+    
+    if not result:
+        result = "UNKNOWN; URL could not be reached"
+        
+    status = "UP" if str(result) == str(expected_response) else "DOWN"
+
+    next_check_time = datetime.datetime.now() + datetime.timedelta(minutes=service['frequency'])
+
+    # Track consecutive down counts
+    if status == "DOWN":
+        service['consecutive_downs'] += 1
+        # Send email if 3 consecutive downs are detected
+        if service['consecutive_downs'] % 3 == 0:
+            send_downtime_alert(service)
+    else:
+        # Reset the failure counter if service is UP
+        service['consecutive_downs'] = 0
+
+    check_result = {
+        "time": datetime.datetime.now(),
+        "response": response if port else result,
+        "url_pinged": f"{url}:{port}" if port else url,
+        "status": status,
+        "next_check": next_check_time
+    }
+
+    collection.update_one(
+        {"id": service['id']},
+        {"$set": {
+            "last_checked": datetime.datetime.now(),
+            "consecutive_downs": service['consecutive_downs']
+        },
+            "$push": {"results": check_result}}
+    )
+
+    print(f"Service {service['name_of_service']} checked. Status: {status}")
+
+ 
+
+def send_downtime_alert(service):
+    subject = f"Alert: {service['name_of_service']} - {service['url']} is down!"
+    body = f"The service {service['name_of_service']} ({service['url']}) has been down for the last 3 checks. Please investigate."
+
+    email_sender.send_email(
+        from_addr=os.getenv("EMAIL_USER"),
+        to_addrs=["daksh@dakshthapar.com"],  # Replace with actual recipient(s)
+        subject=subject,
+        body=body
+    )
 
 def run_checks():
     services = collection.find()
@@ -83,10 +130,46 @@ def index():
     services = list(collection.find())
     return render_template('index.html', services=services)
 
-@app.route('/events')
+@app.route('/events', methods=['GET', 'POST'])
 def events():
-    services = list(collection.find())
-    return render_template('events.html', services=services)
+    # Default time filter: show events from the last 24 hours
+    end_time = datetime.datetime.now()
+    start_time = end_time - datetime.timedelta(days=1)
+
+    if request.method == 'POST':
+        start_time_str = request.form.get('start_time')
+        end_time_str = request.form.get('end_time')
+
+        # Parse the provided start and end times
+        if start_time_str:
+            start_time = datetime.datetime.fromisoformat(start_time_str)
+        if end_time_str:
+            end_time = datetime.datetime.fromisoformat(end_time_str)
+
+    # Fetch all events from all services within the time range
+    services = collection.find({
+        "results.time": {"$gte": start_time, "$lte": end_time}
+    })
+
+    # Flatten the results and sort them by time
+    events = []
+    for service in services:
+        for result in service['results']:
+            if start_time <= result['time'] <= end_time:
+                event = {
+                    "service_name": service['name_of_service'],
+                    "url_pinged": result['url_pinged'],
+                    "time": result['time'],
+                    "status": result['status'],
+                    "response": result['response']
+                }
+                events.append(event)
+
+    # Sort the events by time
+    events = sorted(events, key=lambda x: x['time'], reverse=True)
+
+    return render_template('events.html', events=events, start_time=start_time, end_time=end_time)
+
 
 @app.route('/manual_run_checks')
 def manual_run_checks():
@@ -100,65 +183,68 @@ def manual_check(service_id):
         check_service(service)
     return redirect(url_for('index'))
 
-@app.route('/add', methods=['POST'])
+@app.route('/add_service', methods=['GET', 'POST'])
 def add_service():
-    name = request.form.get('name')
-    url = request.form.get('url')
-    port = request.form.get('port')  # Get the port from the form
-    frequency = int(request.form.get('frequency'))
-    request_type = request.form.get('request_type')
-    response_type = request.form.get('response_type')
-    response = request.form.get('response')
+    if request.method == 'POST':
+        name = request.form.get('name')
+        url = request.form.get('url')
+        port = request.form.get('port')  # Get the port from the form
+        frequency = int(request.form.get('frequency'))
+        request_type = request.form.get('request_type')
+        response_type = request.form.get('response_type')
+        response = request.form.get('response')
 
-    service = {
-        "id": str(uuid.uuid4()),
-        "date_added": datetime.datetime.now(),
-        "frequency": frequency,
-        "last_checked": None,
-        "results": [],
-        "name_of_service": name,
-        "url": url,
-        "port": int(port) if port else None,  # Store the port as an integer if provided
-        "request_type": request_type,
-        "response_type": response_type,
-        "response": response
-    }
-    collection.insert_one(service)
-    scheduler.add_job(func=check_service, trigger="interval", args=[service], seconds=frequency * 60, id=service['id'])
-    return redirect(url_for('index'))
+        service = {
+            "id": str(uuid.uuid4()),
+            "date_added": datetime.datetime.now(),
+            "frequency": frequency,
+            "last_checked": None,
+            "consecutive_downs": 0,  # Initialize consecutive downs counter
+            "results": [],
+            "name_of_service": name,
+            "url": url,
+            "port": int(port) if port else None,  # Store the port as an integer if provided
+            "request_type": request_type,
+            "response_type": response_type,
+            "response": response
+        }
+        collection.insert_one(service)
+        scheduler.add_job(func=check_service, trigger="interval", args=[service], seconds=frequency * 60, id=service['id'])
+        return redirect(url_for('index'))
+    else:
+        form_type = request.args.get('form_type', 'website')
+        return render_template('add_service.html', form_type=form_type)
+
+@app.route('/clear_history', methods=['POST'])
+def clear_history():
+    # Remove all results from all services
+    collection.update_many({}, {"$set": {"results": []}})
+    flash('Event history cleared successfully!', 'success')
+    return redirect(url_for('events'))
 
 @app.route('/edit/<service_id>', methods=['GET', 'POST'])
 def edit_service(service_id):
     service = collection.find_one({"id": service_id})
-    print("Clicked")
     if request.method == 'POST':
         name = request.form.get('name')
         url = request.form.get('url')
-        port = request.form.get('port')
+        port = request.form.get('port')  # Get the port from the form
         frequency = int(request.form.get('frequency'))
-        service_type = request.form.get('service_type')
-        print(f"Submitted data: name={name}, url={url}, port={port}, frequency={frequency}, service_type={service_type}")
-
-        update_fields = {
-            "name_of_service": name,
-            "url": url,
-            "frequency": frequency,
-        }
-
-        if service_type == 'port':
-            update_fields['port'] = int(port) if port else None
-            update_fields['request_type'] = None
-            update_fields['response_type'] = None
-            update_fields['response'] = None
-        else:
-            update_fields['port'] = None
-            update_fields['request_type'] = request.form.get('request_type')
-            update_fields['response_type'] = request.form.get('response_type')
-            update_fields['response'] = request.form.get('response')
+        request_type = request.form.get('request_type')
+        response_type = request.form.get('response_type')
+        response = request.form.get('response')
 
         collection.update_one(
             {"id": service_id},
-            {"$set": update_fields}
+            {"$set": {
+                "name_of_service": name,
+                "url": url,
+                "port": int(port) if port else None,  # Store the port as an integer if provided
+                "frequency": frequency,
+                "request_type": request_type,
+                "response_type": response_type,
+                "response": response
+            }}
         )
         scheduler.reschedule_job(service_id, trigger="interval", seconds=frequency * 60)
         return redirect(url_for('index'))

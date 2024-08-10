@@ -4,17 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Uptime Robot{% endblock %}</title>
+    <title>Event Viewer</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.2/dist/tailwind.min.css" rel="stylesheet">
     <script>
-        function toggleDropdown() {
-            var dropdown = document.getElementById('dropdown');
+        function toggleMonitoringDropdown() {
+            var dropdown = document.getElementById('monitoring-dropdown');
             dropdown.classList.toggle('hidden');
         }
 
-        function showForm(formType) {
-            document.getElementById('website-form').style.display = formType === 'website' ? 'block' : 'none';
-            document.getElementById('port-form').style.display = formType === 'port' ? 'block' : 'none';
+        function toggleJsonDropdown() {
+            var dropdown = document.getElementById('json-dropdown');
+            dropdown.classList.toggle('hidden');
         }
     </script>
 </head>
@@ -26,19 +26,20 @@
                 <a href="{{ url_for('index') }}" class="text-white text-xl font-bold mr-4">Uptime Robot</a>
                 <a href="{{ url_for('events') }}" class="text-white text-lg mr-4">Event Viewer</a>
                 <div class="relative inline-block">
-                    <button onclick="toggleDropdown()" class="text-white text-lg">Monitoring Options ▼</button>
-                    <div id="dropdown" class="absolute mt-2 py-2 w-48 bg-white rounded-lg shadow-xl hidden">
-                        <a href="javascript:void(0);" onclick="showForm('website')"
+                    <button onclick="toggleMonitoringDropdown()" class="text-white text-lg">Add Options
+                        ▼</button>
+                    <div id="monitoring-dropdown" class="absolute mt-2 py-2 w-48 bg-white rounded-lg shadow-xl hidden">
+                        <a href="{{ url_for('add_service') }}?form_type=website"
                             class="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white">Website
                             Monitoring</a>
-                        <a href="javascript:void(0);" onclick="showForm('port')"
+                        <a href="{{ url_for('add_service') }}?form_type=port"
                             class="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white">Port Monitoring</a>
                     </div>
                 </div>
             </div>
             <div class="relative">
-                <button onclick="toggleDropdown()" class="text-white text-lg">Manage JSON ▼</button>
-                <div id="dropdown" class="absolute right-0 mt-2 py-2 w-48 bg-white rounded-lg shadow-xl hidden">
+                <button onclick="toggleJsonDropdown()" class="text-white text-lg">Manage JSON ▼</button>
+                <div id="json-dropdown" class="absolute right-0 mt-2 py-2 w-48 bg-white rounded-lg shadow-xl hidden">
                     <a href="{{ url_for('dump_json') }}"
                         class="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white">Download JSON</a>
                     <a href="{{ url_for('upload_page') }}"

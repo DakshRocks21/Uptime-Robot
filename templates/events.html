@@ -3,41 +3,64 @@
 {% block title %}Event Viewer{% endblock %}
 
 {% block content %}
-<h1 class="text-3xl font-bold mb-4">Service Event Viewer</h1>
-<table class="w-full table-auto mb-4">
-    <thead>
-        <tr class="bg-gray-200">
-            <th class="px-4 py-2">Service Name</th>
-            <th class="px-4 py-2">URL</th>
-            <th class="px-4 py-2">Test Time</th>
-            <th class="px-4 py-2">Response</th>
-            <th class="px-4 py-2">Status</th>
-            <th class="px-4 py-2">Next Test Time</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for service in services %}
-        {% for result in service.results %}
-        <tr>
-            <td class="border px-4 py-2">{{ service.name_of_service }}</td>
-            <td class="border px-4 py-2">{{ result.url_pinged }}</td>
-            <td class="border px-4 py-2">{{ result.time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-            <td class="border px-4 py-2">{{ result.response }}</td>
-            <td class="border px-4 py-2">
-                <span class="text-{{ 'green-600' if result.status == 'UP' else 'red-600' }}">
-                    {{ result.status }}
-                </span>
-            </td>
-            <td class="border px-4 py-2">
-                {% if result.next_check %}
-                {{ result.next_check.strftime('%Y-%m-%d %H:%M:%S') }}
-                {% else %}
-                N/A
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-        {% endfor %}
-    </tbody>
-</table>
+<div class="flex justify-between items-center mb-4">
+    <h1 class="text-3xl font-bold">Event Viewer</h1>
+
+    <form action="{{ url_for('clear_history') }}" method="POST">
+        <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded">Clear History</button>
+    </form>
+</div>
+
+<form method="POST" class="mb-4 p-4 bg-white shadow rounded">
+    <div class="flex items-end space-x-4">
+        <div class="w-1/2">
+            <label class="block text-gray-700 font-bold mb-2" for="start_time">Start Time</label>
+            <input type="datetime-local" name="start_time" id="start_time" value="{{ start_time.isoformat() }}"
+                class="w-full p-2 border border-gray-300 rounded">
+        </div>
+        <div class="w-1/2">
+            <label class="block text-gray-700 font-bold mb-2" for="end_time">End Time</label>
+            <input type="datetime-local" name="end_time" id="end_time" value="{{ end_time.isoformat() }}"
+                class="w-full p-2 border border-gray-300 rounded">
+        </div>
+        <div>
+            <button type="submit" class="bg-blue-500 text-white px-4 py-2 h-11 rounded">Filter</button>
+        </div>
+    </div>
+</form>
+
+<div class="bg-white shadow rounded p-4 bg-black">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold inline-block text-center">Filtered Events</h2>
+        <a href="{{ url_for('events') }}" class="text-blue-700 px-1 py-2 rounded inline-block text-center">X
+            Remove
+            Filters</a>
+    </div>
+    {% if events %}
+    <table class="w-full table-auto">
+        <thead>
+            <tr class="bg-gray-200">
+                <th class="px-4 py-2">Time</th>
+                <th class="px-4 py-2">Service Name</th>
+                <th class="px-4 py-2">URL/IP</th>
+                <th class="px-4 py-2">Status</th>
+                <th class="px-4 py-2">Response</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in events %}
+            <tr>
+                <td class="border px-4 py-2">{{ event.time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                <td class="border px-4 py-2">{{ event.service_name }}</td>
+                <td class="border px-4 py-2">{{ event.url_pinged }}</td>
+                <td class="border px-4 py-2">{{ event.status }}</td>
+                <td class="border px-4 py-2">{{ event.response }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-center text-gray-600">No event history available for the selected time range.</p>
+    {% endif %}
+</div>
 {% endblock %}
