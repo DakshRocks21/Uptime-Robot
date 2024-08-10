@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Event Viewer{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-bold mb-4">Service Event Viewer</h1>
+<table class="w-full table-auto mb-4">
+    <thead>
+        <tr class="bg-gray-200">
+            <th class="px-4 py-2">Service Name</th>
+            <th class="px-4 py-2">URL</th>
+            <th class="px-4 py-2">Test Time</th>
+            <th class="px-4 py-2">Response</th>
+            <th class="px-4 py-2">Status</th>
+            <th class="px-4 py-2">Next Test Time</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for service in services %}
+        {% for result in service.results %}
+        <tr>
+            <td class="border px-4 py-2">{{ service.name_of_service }}</td>
+            <td class="border px-4 py-2">{{ result.url_pinged }}</td>
+            <td class="border px-4 py-2">{{ result.time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td class="border px-4 py-2">{{ result.response }}</td>
+            <td class="border px-4 py-2">
+                <span class="text-{{ 'green-600' if result.status == 'UP' else 'red-600' }}">
+                    {{ result.status }}
+                </span>
+            </td>
+            <td class="border px-4 py-2">
+                {% if result.next_check %}
+                {{ result.next_check.strftime('%Y-%m-%d %H:%M:%S') }}
+                {% else %}
+                N/A
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

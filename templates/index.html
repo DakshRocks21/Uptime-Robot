@@ -1,128 +1,115 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Uptime Robot</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.2/dist/tailwind.min.css" rel="stylesheet">
-</head>
+{% block title %}Dashboard{% endblock %}
 
-<body class="bg-gray-100 text-gray-800">
-    <div class="container mx-auto p-4">
-        <h1 class="text-3xl font-bold mb-4">Uptime Robot</h1>
+{% block content %}
+<h1 class="text-3xl font-bold mb-4">Uptime Robot</h1>
 
-        <form action="{{ url_for('add_service') }}" method="POST" class="mb-4 p-4 bg-white shadow rounded">
-            <div class="mb-2">
-                <label class="block font-bold">Service Name</label>
-                <input type="text" name="name" class="w-full p-2 border border-gray-300 rounded" required>
-            </div>
-            <div class="mb-2">
-                <label class="block font-bold">URL</label>
-                <input type="url" name="url" class="w-full p-2 border border-gray-300 rounded" required>
-            </div>
-            <div class="mb-2">
-                <label class="block font-bold">Frequency (minutes)</label>
-                <input type="number" name="frequency" class="w-full p-2 border border-gray-300 rounded" required>
-            </div>
-            <div class="mb-2">
-                <label class="block font-bold">Request Type</label>
-                <select name="request_type" class="w-full p-2 border border-gray-300 rounded">
-                    <option value="GET">GET</option>
-                    <option value="POST">POST</option>
-                </select>
-            </div>
-            <div class="mb-2">
-                <label class="block font-bold">Response Type</label>
-                <select name="response_type" class="w-full p-2 border border-gray-300 rounded">
-                    <option value="STATUS CODE">STATUS CODE</option>
-                    <option value="JSON">JSON</option>
-                    <option value="TEXT">TEXT</option>
-                </select>
-            </div>
-            <div class="mb-2">
-                <label class="block font-bold">Expected Response</label>
-                <input type="text" name="response" class="w-full p-2 border border-gray-300 rounded" required>
-            </div>
-            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Add Service</button>
-        </form>
-
-        <div class="bg-white shadow rounded p-4">
-            <h2 class="text-2xl font-bold mb-4">Services</h2>
-            <table class="w-full table-auto">
-                <thead>
-                    <tr class="bg-gray-200">
-                        <th class="px-4 py-2">Service Name</th>
-                        <th class="px-4 py-2">URL</th>
-                        <th class="px-4 py-2">Last Checked</th>
-                        <th class="px-4 py-2">Status</th>
-                        <th class="px-4 py-2">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for service in services %}
-                    <tr>
-                        <td class="border px-4 py-2">{{ service.name_of_service }}</td>
-                        <td class="border px-4 py-2">{{ service.url }}</td>
-                        <td class="border px-4 py-2">
-                            {% if service.last_checked %}
-                            {{ service.last_checked.strftime('%Y-%m-%d %H:%M:%S') }}
-                            {% else %}
-                            Never
-                            {% endif %}
-                        </td>
-                        <td class="border px-4 py-2">
-                            {% if service.results %}
-                            {{ service.results[-1].status }}
-                            {% else %}
-                            Unknown
-                            {% endif %}
-                        </td>
-                        <td class="border px-4 py-2">
-                            <a href="{{ url_for('edit_service', service_id=service.id) }}"
-                                class="bg-yellow-500 text-white px-4 py-2 rounded">Edit</a>
-                            <form action="{{ url_for('delete_service', service_id=service.id) }}" method="POST"
-                                style="display:inline;">
-                                <button type="submit"
-                                    class="bg-red-500 text-white px-4 py-2 rounded ml-2">Delete</button>
-                            </form>
-                            <form action="{{ url_for('manual_check', service_id=service.id) }}" method="POST"
-                                style="display:inline;">
-                                <button type="submit"
-                                    class="bg-green-500 text-white px-4 py-2 rounded ml-2">Check Now</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<div id="website-form" style="display: none;">
+    <form action="{{ url_for('add_service') }}" method="POST" class="mb-4 p-4 bg-white shadow rounded">
+        <div class="mb-2">
+            <label class="block font-bold">Service Name</label>
+            <input type="text" name="name" class="w-full p-2 border border-gray-300 rounded" required>
         </div>
-        <form action="{{ url_for('manual_run_checks') }}" method="GET" class="mt-4">
-            <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded">Run All Checks Now</button>
-        </form>
-        <div class="mt-4 p-4 bg-white shadow rounded">
-            <h2 class="text-2xl font-bold mb-4">Manage JSON</h2>
-            <a href="{{ url_for('dump_json') }}" class="bg-blue-500 text-white px-4 py-2 rounded">Download JSON</a>
-
-            <form action="{{ url_for('upload_json') }}" method="POST" enctype="multipart/form-data" class="mt-4">
-                <input type="file" name="file" class="w-full p-2 border border-gray-300 rounded mb-2" required>
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Upload JSON</button>
-            </form>
+        <div class="mb-2">
+            <label class="block font-bold">URL</label>
+            <input type="url" name="url" class="w-full p-2 border border-gray-300 rounded" required>
         </div>
+        <div class="mb-2">
+            <label class="block font-bold">Frequency (minutes)</label>
+            <input type="number" name="frequency" class="w-full p-2 border border-gray-300 rounded" required>
+        </div>
+        <div class="mb-2">
+            <label class="block font-bold">Request Type</label>
+            <select name="request_type" class="w-full p-2 border border-gray-300 rounded">
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+            </select>
+        </div>
+        <div class="mb-2">
+            <label class="block font-bold">Response Type</label>
+            <select name="response_type" class="w-full p-2 border border-gray-300 rounded">
+                <option value="STATUS CODE">STATUS CODE</option>
+                <option value="JSON">JSON</option>
+                <option value="TEXT">TEXT</option>
+            </select>
+        </div>
+        <div class="mb-2">
+            <label class="block font-bold">Expected Response</label>
+            <input type="text" name="response" class="w-full p-2 border border-gray-300 rounded">
+        </div>
+        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Add Service</button>
+    </form>
+</div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="mt-4">
-            {% for category, message in messages %}
-            <div class="bg-{{ 'red' if category == 'error' else 'green' }}-100 border border-{{ 'red' if category == 'error' else 'green' }}-400 text-{{ 'red' if category == 'error' else 'green' }}-700 px-4 py-3 rounded relative"
-                role="alert">
-                {{ message }}
-            </div>
+<div id="port-form" style="display: none;">
+    <form action="{{ url_for('add_service') }}" method="POST" class="mb-4 p-4 bg-white shadow rounded">
+        <div class="mb-2">
+            <label class="block font-bold">Service Name</label>
+            <input type="text" name="name" class="w-full p-2 border border-gray-300 rounded" required>
+        </div>
+        <div class="mb-2">
+            <label class="block font-bold">IP Address/URL</label>
+            <input type="text" name="url" class="w-full p-2 border border-gray-300 rounded" required>
+        </div>
+        <div class="mb-2">
+            <label class="block font-bold">Port</label>
+            <input type="number" name="port" class="w-full p-2 border border-gray-300 rounded" required>
+        </div>
+        <div class="mb-2">
+            <label class="block font-bold">Frequency (minutes)</label>
+            <input type="number" name="frequency" class="w-full p-2 border border-gray-300 rounded" required>
+        </div>
+        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Add Service</button>
+    </form>
+</div>
+
+<div class="bg-white shadow rounded p-4">
+    <h2 class="text-2xl font-bold mb-4">Services</h2>
+    <table class="w-full table-auto">
+        <thead>
+            <tr class="bg-gray-200">
+                <th class="px-4 py-2">Service Name</th>
+                <th class="px-4 py-2">URL/IP:Port</th>
+                <th class="px-4 py-2">Last Checked</th>
+                <th class="px-4 py-2">Status</th>
+                <th class="px-4 py-2">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for service in services %}
+            <tr>
+                <td class="border px-4 py-2">{{ service.name_of_service }}</td>
+                <td class="border px-4 py-2">{{ service.url }}{% if service.port %}:{{ service.port }}{% endif %}</td>
+                <td class="border px-4 py-2">
+                    {% if service.last_checked %}
+                    {{ service.last_checked.strftime('%Y-%m-%d %H:%M:%S') }}
+                    {% else %}
+                    Never
+                    {% endif %}
+                </td>
+                <td class="border px-4 py-2">
+                    {% if service.results %}
+                    {{ service.results[-1].status }}
+                    {% else %}
+                    Unknown
+                    {% endif %}
+                </td>
+                <td class="border px-4 py-2">
+                    <a href="{{ url_for('edit_service', service_id=service.id) }}"
+                        class="bg-yellow-500 text-white px-4 py-2 rounded">Edit</a>
+                    <form action="{{ url_for('delete_service', service_id=service.id) }}" method="POST"
+                        style="display:inline;">
+                        <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded ml-2">Delete</button>
+                    </form>
+                    <form action="{{ url_for('manual_check', service_id=service.id) }}" method="POST"
+                        style="display:inline;">
+                        <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded ml-2">Check Now</button>
+                    </form>
+                </td>
+            </tr>
             {% endfor %}
-        </div>
-        {% endif %}
-        {% endwith %}
-    </div>
-</body>
-
-</html>
+        </tbody>
+    </table>
+</div>
+{% endblock %}

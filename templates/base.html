@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Uptime Robot{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.2/dist/tailwind.min.css" rel="stylesheet">
+    <script>
+        function toggleDropdown() {
+            var dropdown = document.getElementById('dropdown');
+            dropdown.classList.toggle('hidden');
+        }
+
+        function showForm(formType) {
+            document.getElementById('website-form').style.display = formType === 'website' ? 'block' : 'none';
+            document.getElementById('port-form').style.display = formType === 'port' ? 'block' : 'none';
+        }
+    </script>
+</head>
+
+<body class="bg-gray-100 text-gray-800">
+    <nav class="bg-blue-500 p-4">
+        <div class="container mx-auto flex justify-between">
+            <div>
+                <a href="{{ url_for('index') }}" class="text-white text-xl font-bold mr-4">Uptime Robot</a>
+                <a href="{{ url_for('events') }}" class="text-white text-lg mr-4">Event Viewer</a>
+                <div class="relative inline-block">
+                    <button onclick="toggleDropdown()" class="text-white text-lg">Monitoring Options ▼</button>
+                    <div id="dropdown" class="absolute mt-2 py-2 w-48 bg-white rounded-lg shadow-xl hidden">
+                        <a href="javascript:void(0);" onclick="showForm('website')"
+                            class="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white">Website
+                            Monitoring</a>
+                        <a href="javascript:void(0);" onclick="showForm('port')"
+                            class="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white">Port Monitoring</a>
+                    </div>
+                </div>
+            </div>
+            <div class="relative">
+                <button onclick="toggleDropdown()" class="text-white text-lg">Manage JSON ▼</button>
+                <div id="dropdown" class="absolute right-0 mt-2 py-2 w-48 bg-white rounded-lg shadow-xl hidden">
+                    <a href="{{ url_for('dump_json') }}"
+                        class="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white">Download JSON</a>
+                    <a href="{{ url_for('upload_page') }}"
+                        class="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white">Upload JSON</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="container mx-auto p-4">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+
+</html>
