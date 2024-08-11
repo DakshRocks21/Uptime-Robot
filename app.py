@@ -45,7 +45,6 @@ email_sender = EmailSender(
 scheduler = BackgroundScheduler()
 
 import time  # Import the time module for measuring response time
-
 def check_service(service):
     url = service['url']
     port = service.get('port')  # Retrieve the port if it exists
@@ -56,23 +55,21 @@ def check_service(service):
     response_time = None
 
     try:
-        # Check if port is specified
         if port:
-            start_time = time.time()  # Start timing
+            start_time = time.time()
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.settimeout(10)  # Set timeout to 10 seconds
+                sock.settimeout(10)
                 result = sock.connect_ex((url, port))
                 status = "UP" if result == 0 else "DOWN"
                 response = 'OPEN' if result == 0 else 'CLOSED'
-            response_time = (time.time() - start_time) * 1000  # Calculate response time in milliseconds
+            response_time = (time.time() - start_time) * 1000
         else:
-            # Normal URL check
-            start_time = time.time()  # Start timing
+            start_time = time.time()
             if request_type == 'GET':
                 response = requests.get(url)
             elif request_type == 'POST':
                 response = requests.post(url)
-            response_time = (time.time() - start_time) * 1000  # Calculate response time in milliseconds
+            response_time = (time.time() - start_time) * 1000
 
             if service['response_type'] == 'STATUS CODE':
                 result = response.status_code
@@ -90,14 +87,14 @@ def check_service(service):
 
     next_check_time = datetime.datetime.now() + datetime.timedelta(minutes=service['frequency'])
 
-    # Track consecutive down counts
     if status == "DOWN":
         service['consecutive_downs'] += 1
-        # Send email if 3 consecutive downs are detected
         if service['consecutive_downs'] % 3 == 0:
             send_downtime_alert(service)
+            send_webhook(service, status, response_time)
     else:
-        # Reset the failure counter if service is UP
+        if service['consecutive_downs'] > 0:
+            send_webhook(service, status, response_time)
         service['consecutive_downs'] = 0
 
     check_result = {
@@ -105,7 +102,7 @@ def check_service(service):
         "response": response if port else result,
         "url_pinged": f"{url}:{port}" if port else url,
         "status": status,
-        "response_time": response_time,  # Store the response time
+        "response_time": response_time,
         "next_check": next_check_time
     }
 
@@ -119,6 +116,7 @@ def check_service(service):
     )
 
     print(f"Service {service['name_of_service']} checked. Status: {status}, Response Time: {response_time}ms")
+
  
 class User(UserMixin):
     def __init__(self, user_id, username, email, password_hash):
@@ -158,6 +156,30 @@ def send_downtime_alert(service):
         subject=subject,
         body=body
     )
+
+    send_webhook(service, "DOWN", None)  # Call the webhook to notify about the downtime
+
+def send_webhook(service, status, response_time):
+    if 'webhooks' in service and service['webhooks']:
+        payload = {
+            "service_name": service['name_of_service'],
+            "url": service['url'],
+            "status": status,
+            "response_time": response_time,
+            "checked_at": datetime.datetime.now().isoformat()
+        }
+        for webhook_url in service['webhooks']:
+            try:
+                response = requests.post(webhook_url, json=payload)
+                if response.status_code != 200:
+                    print(f"Failed to send webhook to {webhook_url} for {service['name_of_service']}: {response.status_code}")
+                else:
+                    print(f"Webhook sent to {webhook_url} for {service['name_of_service']}")
+            except requests.exceptions.RequestException as e:
+                print(f"Error sending webhook to {webhook_url} for {service['name_of_service']}: {e}")
+    else:
+        print(f"No webhooks configured for service {service['name_of_service']}")
+
 
 def run_checks():
     services = collection.find()
@@ -308,6 +330,7 @@ def manual_check(service_id):
 @login_required
 def add_service():
     if request.method == 'POST':
+        # Existing fields
         name = request.form.get('name')
         url = request.form.get('url')
         port = request.form.get('port')
@@ -315,10 +338,11 @@ def add_service():
         request_type = request.form.get('request_type')
         response_type = request.form.get('response_type')
         response = request.form.get('response')
+        webhooks = request.form.getlist('webhooks')  # Get the list of webhook URLs
 
         service = {
             "id": str(uuid.uuid4()),
-            "user_id": current_user.id,  # Associate with the logged-in user
+            "user_id": current_user.id,
             "date_added": datetime.datetime.now(),
             "frequency": frequency,
             "last_checked": None,
@@ -329,7 +353,8 @@ def add_service():
             "port": int(port) if port else None,
             "request_type": request_type,
             "response_type": response_type,
-            "response": response
+            "response": response,
+            "webhooks": webhooks  # Store the list of webhook URLs
         }
         collection.insert_one(service)
         scheduler.add_job(func=check_service, trigger="interval", args=[service], seconds=frequency * 60, id=service['id'])
@@ -337,6 +362,7 @@ def add_service():
     else:
         form_type = request.args.get('form_type', 'website')
         return render_template('add_service.html', form_type=form_type)
+
 
 
 @app.route('/clear_history', methods=['POST'])
@@ -360,6 +386,7 @@ def service_info(service_id):
         request_type = request.form.get('request_type')
         response_type = request.form.get('response_type')
         response = request.form.get('response')
+        webhooks = request.form.getlist('webhooks')  # Get the updated list of webhook URLs
 
         collection.update_one(
             {"id": service_id},
@@ -370,7 +397,8 @@ def service_info(service_id):
                 "frequency": frequency,
                 "request_type": request_type,
                 "response_type": response_type,
-                "response": response
+                "response": response,
+                "webhooks": webhooks  # Update the list of webhook URLs
             }}
         )
         scheduler.reschedule_job(service_id, trigger="interval", seconds=frequency * 60)
