@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="mx-auto mt-5">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-4xl font-bold text-gray-800">Uptime Robot Dashboard</h1>
+        <a href="{{ url_for('add_service') }}?form_type=website"
+            class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            Add a Service
+        </a>
+    </div>
+
+    <!-- Services Table -->
+    <div class="bg-white shadow-md rounded-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Services</h2>
+        <table class="w-full table-auto">
+            <thead>
+                <tr class="bg-gray-200 text-gray-700">
+                    <th class="px-6 py-3 text-left text-sm font-medium">Service Name</th>
+                    <th class="px-6 py-3 text-left text-sm font-medium">URL/IP:Port</th>
+                    <th class="px-6 py-3 text-left text-sm font-medium">Last Checked</th>
+                    <th class="px-6 py-3 text-left text-sm font-medium">Status</th>
+                    <th class="px-6 py-3 text-left text-sm font-medium">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for service in services %}
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ service.name_of_service }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">{{ service.url }}{% if service.port %}:{{ service.port }}{%
+                        endif %}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if service.last_checked %}
+                        {{ service.last_checked.strftime('%Y-%m-%d %H:%M:%S') }}
+                        {% else %}
+                        Never
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if service.results %}
+                        <span
+                            class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ 'bg-green-100 text-green-800' if service.results[-1].status == 'UP' else 'bg-red-100 text-red-800' }}">
+                            {{ service.results[-1].status }}
+                        </span>
+                        {% else %}
+                        <span class="text-gray-500">Unknown</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <a href="{{ url_for('edit_service', service_id=service.id) }}"
+                            class="bg-yellow-500 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500">Edit</a>
+                        <form action="{{ url_for('delete_service', service_id=service.id) }}" method="POST"
+                            style="display:inline;">
+                            <button type="submit"
+                                class="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg shadow ml-2 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500">Delete</button>
+                        </form>
+                        <form action="{{ url_for('manual_check', service_id=service.id) }}" method="POST"
+                            style="display:inline;">
+                            <button type="submit"
+                                class="bg-green-500 text-white font-semibold py-2 px-4 rounded-lg shadow ml-2 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">Check
+                                Now</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

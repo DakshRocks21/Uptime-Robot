@@ -1,90 +1,110 @@
 {% extends "base.html" %}
 
-{% block content %}
-<!-- Website Monitoring Form -->
-<div id="website-form" class="hidden">
-    <h2 class="text-2xl font-bold mb-4">Add Website Monitoring</h2>
-    <form action="{{ url_for('add_service') }}" method="POST" class="mb-4 p-6 bg-white shadow-md rounded-lg">
-        <div class="mb-4">
-            <label class="block text-gray-700 font-medium mb-2" for="name">Service Name</label>
-            <input type="text" name="name" id="name"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required>
-        </div>
-        <div class="mb-4">
-            <label class="block text-gray-700 font-medium mb-2" for="url">URL</label>
-            <input type="url" name="url" id="url"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required>
-        </div>
-        <div class="mb-4">
-            <label class="block text-gray-700 font-medium mb-2" for="frequency">Frequency (minutes)</label>
-            <input type="number" name="frequency" id="frequency"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required>
-        </div>
-        <div class="mb-4">
-            <label class="block text-gray-700 font-medium mb-2" for="request_type">Request Type</label>
-            <select name="request_type" id="request_type"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="GET">GET</option>
-                <option value="POST">POST</option>
-            </select>
-        </div>
-        <div class="mb-4">
-            <label class="block text-gray-700 font-medium mb-2" for="response_type">Response Type</label>
-            <select name="response_type" id="response_type"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="STATUS CODE">STATUS CODE</option>
-                <option value="JSON">JSON</option>
-                <option value="TEXT">TEXT</option>
-            </select>
-        </div>
-        <div class="mb-4">
-            <label class="block text-gray-700 font-medium mb-2" for="response">Expected Response</label>
-            <input type="text" name="response" id="response"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>
-        <button type="submit"
-            class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            Add Service
-        </button>
-    </form>
-</div>
+{% block title %}Add a Service{% endblock %}
 
-<!-- Port Monitoring Form -->
-<div id="port-form" class="hidden">
-    <h2 class="text-2xl font-bold mb-4">Add Port Monitoring</h2>
-    <form action="{{ url_for('add_service') }}" method="POST" class="mb-4 p-6 bg-white shadow-md rounded-lg">
-        <div class="mb-4">
-            <label class="block text-gray-700 font-medium mb-2" for="name">Service Name</label>
-            <input type="text" name="name" id="name"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required>
+{% block content %}
+<div class="mx-auto mt-5 bg-white p-8 rounded-lg shadow-md">
+    <h1 class="text-4xl font-bold text-gray-800 mb-8">Add a New Service</h1>
+
+    <!-- Service Type Selection -->
+    <div class="mb-8">
+        <label class="block text-gray-700 font-medium mb-2">Select Service Type</label>
+        <div class="flex space-x-4">
+            <button onclick="showForm('website')"
+                class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Website
+                Monitoring</button>
+            <button onclick="showForm('port')"
+                class="w-full bg-green-600 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">Port
+                Monitoring</button>
         </div>
-        <div class="mb-4">
-            <label class="block text-gray-700 font-medium mb-2" for="url">IP Address/URL</label>
-            <input type="text" name="url" id="url"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required>
-        </div>
-        <div class="mb-4">
-            <label class="block text-gray-700 font-medium mb-2" for="port">Port</label>
-            <input type="number" name="port" id="port"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required>
-        </div>
-        <div class="mb-4">
-            <label class="block text-gray-700 font-medium mb-2" for="frequency">Frequency (minutes)</label>
-            <input type="number" name="frequency" id="frequency"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required>
-        </div>
-        <button type="submit"
-            class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            Add Service
-        </button>
-    </form>
+    </div>
+
+    <!-- Website Monitoring Form -->
+    <div id="website-form" class="hidden">
+        <h2 class="text-2xl font-bold mb-4">Add Website Monitoring</h2>
+        <form action="{{ url_for('add_service') }}" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-gray-700 font-medium mb-2" for="name">Service Name</label>
+                <input type="text" name="name" id="name"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <div>
+                <label class="block text-gray-700 font-medium mb-2" for="url">URL</label>
+                <input type="url" name="url" id="url"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <div>
+                <label class="block text-gray-700 font-medium mb-2" for="frequency">Frequency (minutes)</label>
+                <input type="number" name="frequency" id="frequency"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <div>
+                <label class="block text-gray-700 font-medium mb-2" for="request_type">Request Type</label>
+                <select name="request_type" id="request_type"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-gray-700 font-medium mb-2" for="response_type">Response Type</label>
+                <select name="response_type" id="response_type"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="STATUS CODE">STATUS CODE</option>
+                    <option value="JSON">JSON</option>
+                    <option value="TEXT">TEXT</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-gray-700 font-medium mb-2" for="response">Expected Response</label>
+                <input type="text" name="response" id="response"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <button type="submit"
+                class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Add
+                Service</button>
+        </form>
+    </div>
+
+    <!-- Port Monitoring Form -->
+    <div id="port-form" class="hidden">
+        <h2 class="text-2xl font-bold mb-4">Add Port Monitoring</h2>
+        <form action="{{ url_for('add_service') }}" method="POST" class="space-y-4">
+            <div>
+                <label class="block text-gray-700 font-medium mb-2" for="name">Service Name</label>
+                <input type="text" name="name" id="name"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <div>
+                <label class="block text-gray-700 font-medium mb-2" for="url">IP Address/URL</label>
+                <input type="text" name="url" id="url"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <div>
+                <label class="block text-gray-700 font-medium mb-2" for="port">Port</label>
+                <input type="number" name="port" id="port"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <div>
+                <label class="block text-gray-700 font-medium mb-2" for="frequency">Frequency (minutes)</label>
+                <input type="number" name="frequency" id="frequency"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+            </div>
+            <button type="submit"
+                class="w-full bg-green-600 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">Add
+                Service</button>
+        </form>
+    </div>
+
+    <a href="{{ url_for('dashboard') }}"
+        class="mt-6 block text-center text-blue-600 hover:text-blue-700 font-semibold">Back to Dashboard</a>
 </div>
 
 <script>
