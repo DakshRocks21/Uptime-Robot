@@ -12,6 +12,7 @@ import os
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 from bson import ObjectId
+import time
 
 
 
@@ -43,6 +44,8 @@ email_sender = EmailSender(
 # Scheduler
 scheduler = BackgroundScheduler()
 
+import time  # Import the time module for measuring response time
+
 def check_service(service):
     url = service['url']
     port = service.get('port')  # Retrieve the port if it exists
@@ -50,21 +53,26 @@ def check_service(service):
     expected_response = service['response']
     
     result = None
+    response_time = None
 
     try:
         # Check if port is specified
         if port:
+            start_time = time.time()  # Start timing
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.settimeout(10)  # Set timeout to 10 seconds
                 result = sock.connect_ex((url, port))
                 status = "UP" if result == 0 else "DOWN"
                 response = 'OPEN' if result == 0 else 'CLOSED'
+            response_time = (time.time() - start_time) * 1000  # Calculate response time in milliseconds
         else:
             # Normal URL check
+            start_time = time.time()  # Start timing
             if request_type == 'GET':
                 response = requests.get(url)
             elif request_type == 'POST':
                 response = requests.post(url)
+            response_time = (time.time() - start_time) * 1000  # Calculate response time in milliseconds
 
             if service['response_type'] == 'STATUS CODE':
                 result = response.status_code
@@ -97,6 +105,7 @@ def check_service(service):
         "response": response if port else result,
         "url_pinged": f"{url}:{port}" if port else url,
         "status": status,
+        "response_time": response_time,  # Store the response time
         "next_check": next_check_time
     }
 
@@ -109,8 +118,7 @@ def check_service(service):
             "$push": {"results": check_result}}
     )
 
-    print(f"Service {service['name_of_service']} checked. Status: {status}")
-
+    print(f"Service {service['name_of_service']} checked. Status: {status}, Response Time: {response_time}ms")
  
 class User(UserMixin):
     def __init__(self, user_id, username, email, password_hash):
@@ -276,7 +284,6 @@ def events():
 
     return render_template('events.html', events=events, start_time=start_time, end_time=end_time)
 
-
 @app.route('/manual_run_checks')
 @login_required
 def manual_run_checks():
@@ -289,7 +296,13 @@ def manual_check(service_id):
     service = collection.find_one({"id": service_id})
     if service:
         check_service(service)
-    return redirect(url_for('index'))
+    
+    # Get the 'redirect_to' parameter from the query string
+    redirect_to = request.args.get('redirect_to', 'index')
+    
+    # Redirect to the specified page
+    return redirect(url_for(redirect_to, service_id=service_id) if redirect_to == 'service_info' else url_for(redirect_to))
+
 
 @app.route('/add_service', methods=['GET', 'POST'])
 @login_required
@@ -334,14 +347,15 @@ def clear_history():
     flash('Event history cleared successfully!', 'success')
     return redirect(url_for('events'))
 
-@app.route('/edit/<service_id>', methods=['GET', 'POST'])
+@app.route('/info/<service_id>', methods=['GET', 'POST'])
 @login_required
-def edit_service(service_id):
+def service_info(service_id):
     service = collection.find_one({"id": service_id})
+    
     if request.method == 'POST':
         name = request.form.get('name')
         url = request.form.get('url')
-        port = request.form.get('port')  # Get the port from the form
+        port = request.form.get('port')
         frequency = int(request.form.get('frequency'))
         request_type = request.form.get('request_type')
         response_type = request.form.get('response_type')
@@ -352,7 +366,7 @@ def edit_service(service_id):
             {"$set": {
                 "name_of_service": name,
                 "url": url,
-                "port": int(port) if port else None,  # Store the port as an integer if provided
+                "port": int(port) if port else None, 
                 "frequency": frequency,
                 "request_type": request_type,
                 "response_type": response_type,
@@ -360,8 +374,32 @@ def edit_service(service_id):
             }}
         )
         scheduler.reschedule_job(service_id, trigger="interval", seconds=frequency * 60)
-        return redirect(url_for('index'))
-    return render_template('edit.html', service=service)
+        return redirect(url_for('service_info', service_id=service_id))
+
+    statuses = [1 if result['status'] == "UP" else 0 for result in service['results']]
+    timestamps = [result['time'].strftime('%Y-%m-%d %H:%M:%S') for result in service['results']]
+    response_times = [result.get('response_time', 0) for result in service['results'] if result.get('response_time') is not None]
+
+    # Calculate average response time
+    if response_times:
+        average_response_time = sum(response_times) / len(response_times)
+    else:
+        average_response_time = 0
+
+    overall_status = "Operational" if statuses[-1] == 1 else "Unoperational"
+
+    total_checks = len(service.get('results', []))
+    up_checks = sum(statuses)
+    uptime_percentage = (up_checks / total_checks) * 100 if total_checks > 0 else 0
+
+    return render_template('info.html', 
+                           service=service, 
+                           overall_status=overall_status, 
+                           uptime_percentage=uptime_percentage, 
+                           statuses=statuses, 
+                           timestamps=timestamps, 
+                           response_times=response_times, 
+                           average_response_time=average_response_time)
 
 @app.route('/delete/<service_id>', methods=['POST'])
 @login_required

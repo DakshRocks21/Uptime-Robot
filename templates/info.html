@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Service Information{% endblock %}
+
+{% block content %}
+
+<!-- Check Now Button -->
+<div class="flex justify-between mb-2">
+    <h1 class="text-4xl font-bold text-black">{{ service.name_of_service }}</h1>
+    <div class="flex justify-end mb-4">
+        <form action="{{ url_for('manual_check', service_id=service.id) }}?redirect_to=service_info" method="POST">
+            <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded">Check Now</button>
+        </form>
+    </div>
+</div>
+
+<div class="flex w-full flex-row justify-between">
+    <div class="bg-gray-800 p-6 mr-2 rounded-lg shadow-md w-1/2">
+        <h2 class="text-2xl font-bold text-white mb-4">Uptime Percentage</h2>
+        <div id="gauge" class="w-full h-48 text-white"></div>
+    </div>
+    <div class="flex flex-col items-center h-full space-y-2 w-1/2">
+        <div class="bg-gray-800 p-6 mx-2 w-full rounded-lg shadow-md h-1/2">
+            <h2 class="text-2xl font-bold text-white mb-4">Average Response Time</h2>
+            <p class="text-white text-lg">{{ average_response_time | round(2) }} ms</p>
+        </div>
+        <!-- Uptime Status Blocks -->
+        <div class="bg-gray-800 p-6 mx-2 w-full rounded-lg shadow-md h-1/2">
+            <h2 class="text-2xl font-bold text-white mb-4">Uptime Status</h2>
+            <div class="flex flex-wrap">
+                {% for status in statuses[-40:] %}
+                <div class="w-2 h-6 {% if status == 1 %}bg-green-500{% else %}bg-red-500{% endif %} m-1"></div>
+                {% endfor %}
+            </div>
+            <p
+                class="text-right {% if overall_status == 'Operational' %}text-green-500{% else %}text-red-500{% endif %} font-bold mt-2">
+                {{ overall_status }}</p>
+        </div>
+    </div>
+</div>
+
+<!-- Performance Graph -->
+<div class="bg-gray-800 p-6 rounded-lg shadow-md mt-6">
+    <h2 class="text-2xl font-bold text-white mb-4">Performance Metrics</h2>
+    <canvas id="performanceChart" width="400" height="100"></canvas>
+</div>
+
+
+<!-- Service Details and Editable Form -->
+<div class="bg-gray-800 p-6 rounded-lg shadow-md mt-6">
+    <h2 class="text-2xl font-bold text-white mb-4">Service Details</h2>
+    <form action="{{ url_for('service_info', service_id=service.id) }}" method="POST"
+        class="p-4 bg-gray-900 rounded-lg shadow-md">
+        <div class="mb-4">
+            <label class="block font-bold text-white">Service Name:</label>
+            <input type="text" name="name" value="{{ service.name_of_service }}"
+                class="w-full p-2 border border-gray-300 rounded text-black" required>
+        </div>
+
+        <div class="mb-4">
+            <label class="block font-bold text-white">Date Added:</label>
+            <p class="p-2 border border-gray-300 rounded bg-gray-700 text-white">{{ service.date_added }}</p>
+        </div>
+
+        <div class="mb-4">
+            <label class="block font-bold text-white">Next Check:</label>
+            <p class="p-2 border border-gray-300 rounded bg-gray-700 text-white">{{ service.results[-1].next_check if
+                service.results else "N/A" }}</p>
+        </div>
+
+        <div class="mb-4">
+            <label class="block font-bold text-white">URL:</label>
+            <input type="url" name="url" value="{{ service.url }}"
+                class="w-full p-2 border border-gray-300 rounded text-black">
+        </div>
+
+        <div class="mb-4">
+            <label class="block font-bold text-white">Request Type:</label>
+            <select name="request_type" class="w-full p-2 border border-gray-300 rounded text-black">
+                <option value="GET" {% if service.request_type=='GET' %}selected{% endif %}>GET</option>
+                <option value="POST" {% if service.request_type=='POST' %}selected{% endif %}>POST</option>
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="block font-bold text-white">Response Type:</label>
+            <select name="response_type" class="w-full p-2 border border-gray-300 rounded text-black">
+                <option value="STATUS CODE" {% if service.response_type=='STATUS CODE' %}selected{% endif %}>STATUS CODE
+                </option>
+                <option value="JSON" {% if service.response_type=='JSON' %}selected{% endif %}>JSON</option>
+                <option value="TEXT" {% if service.response_type=='TEXT' %}selected{% endif %}>TEXT</option>
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="block font-bold text-white">Expected Response:</label>
+            <input type="text" name="response" value="{{ service.response }}"
+                class="w-full p-2 border border-gray-300 rounded text-black">
+        </div>
+
+        <div class="mb-4">
+            <label class="block font-bold text-white">Frequency (minutes):</label>
+            <input type="number" name="frequency" value="{{ service.frequency }}"
+                class="w-full p-2 border border-gray-300 rounded text-black" required>
+        </div>
+
+        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">Save Changes</button>
+    </form>
+</div>
+
+<!-- JavaScript for Chart.js and JustGage -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.4/raphael-min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/justgage/1.2.9/justgage.min.js"></script>
+<script>
+    // Performance Chart
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    const performanceData = {
+        labels: {{ timestamps | tojson }},
+    datasets: [{
+        label: 'Response Time (ms)',
+        data: {{ response_times | tojson }},
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        borderColor: 'rgba(75, 192, 192, 1)',
+        borderWidth: 1,
+        fill: false,
+        tension: 0.1,
+        stepped: true
+        }]
+    };
+    const performanceConfig = {
+        type: 'line',
+        data: performanceData,
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function (value) {
+                            return value + ' ms';
+                        }
+                    }
+                }
+            }
+        }
+    };
+    new Chart(ctx, performanceConfig);
+    // Uptime Percentage Gauge
+    // Uptime Percentage Gauge
+    new JustGage({
+        id: "gauge",
+        value: {{ uptime_percentage }},
+        min: 0,
+        max: 100,
+        symbol: '%',
+        pointer: true,
+        gaugeWidthScale: 0.6,
+        levelColors: ["#ff0000", "#f9c802", "#a9d70b"],
+        gaugeColor: "#333",
+        label: "Uptime",
+        labelFontColor: "#ffffff",
+        valueFontColor: "#ffffff",
+        titleFontColor: "#ffffff",
+        title: "Uptime"
+});
+
+
+</script>
+{% endblock %}
