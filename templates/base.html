@@ -47,11 +47,15 @@
             <div>
                 <a href="{{ url_for('dashboard') }}"
                     class="text-white text-xl font-bold mr-4 hover:text-gray-300">Uptime Robot</a>
-                {% if current_user.is_authenticated %}
+                {% if current_user.is_authenticated and not current_user.is_admin %}
                 <a href="{{ url_for('events') }}" class="text-white text-lg mr-4 hover:text-gray-300">Event Viewer</a>
                 {% endif %}
             </div>
             <div class="relative">
+                {% if current_user.is_admin %}
+                <a href="{{ url_for('server_settings') }}" class="text-white text-lg mr-4 hover:text-gray-300">Server
+                    Settings</a>
+                {% else %}
                 {% if current_user.is_authenticated %}
                 <button onclick="toggleDropdown('profile-dropdown')" class="text-white text-lg hover:text-gray-300">{{
                     current_user.username }} ▼</button>
@@ -64,6 +68,7 @@
                 {% else %}
                 <a href="{{ url_for('login') }}" class="text-white text-lg mr-4 hover:text-gray-300">Login</a>
                 <a href="{{ url_for('signup') }}" class="text-white text-lg hover:text-gray-300">Sign Up</a>
+                {% endif %}
                 {% endif %}
             </div>
         </div>
