@@ -14,6 +14,8 @@
     </div>
 </div>
 
+{% if service.results %}
+
 <div class="flex w-full flex-row justify-between">
     <div class="bg-gray-800 p-6 mr-2 rounded-lg shadow-md w-1/2">
         <h2 class="text-2xl font-bold text-white mb-4">Uptime Percentage</h2>
@@ -28,7 +30,7 @@
         <div class="bg-gray-800 p-6 mx-2 w-full rounded-lg shadow-md h-1/2">
             <h2 class="text-2xl font-bold text-white mb-4">Uptime Status</h2>
             <div class="flex flex-wrap">
-                {% for status in statuses[-40:] %}
+                {% for status in statuses %}
                 <div class="w-2 h-6 {% if status == 1 %}bg-green-500{% else %}bg-red-500{% endif %} m-1"></div>
                 {% endfor %}
             </div>
@@ -44,6 +46,13 @@
     <h2 class="text-2xl font-bold text-white mb-4">Performance Metrics</h2>
     <canvas id="performanceChart" width="400" height="100"></canvas>
 </div>
+
+{% else %}
+<div class="bg-gray-800 p-6 rounded-lg shadow-md mt-6">
+    <h2 class="text-2xl font-bold text-white mb-4">No Data Available</h2>
+    <p class="text-white">There is not enough data to display performance metrics for this service.</p>
+</div>
+{% endif %}
 
 
 <!-- Service Details and Editable Form -->

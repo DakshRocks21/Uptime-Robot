@@ -386,20 +386,16 @@ def service_info(service_id):
     else:
         average_response_time = 0
 
-    overall_status = "Operational" if statuses[-1] == 1 else "Unoperational"
+    if not statuses:
+        overall_status = "No data"
+    else:
+        overall_status = "Operational" if statuses[-1] == 1 else "Unoperational"
 
     total_checks = len(service.get('results', []))
     up_checks = sum(statuses)
     uptime_percentage = (up_checks / total_checks) * 100 if total_checks > 0 else 0
 
-    return render_template('info.html', 
-                           service=service, 
-                           overall_status=overall_status, 
-                           uptime_percentage=uptime_percentage, 
-                           statuses=statuses, 
-                           timestamps=timestamps, 
-                           response_times=response_times, 
-                           average_response_time=average_response_time)
+    return render_template('info.html', service=service, overall_status=overall_status, uptime_percentage=uptime_percentage, statuses=statuses, timestamps=timestamps, response_times=response_times, average_response_time=average_response_time)
 
 @app.route('/delete/<service_id>', methods=['POST'])
 @login_required
