@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: uptime_robot_web
+    command: flask run --host=0.0.0.0
+    volumes:
+      - .:/app
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - MONGO_URI=mongodb://mongo:27017/uptime_robot
+      - EMAIL_USER=your_email@example.com
+      - EMAIL_PASS=your_email_password
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:5.0
+    container_name: uptime_robot_mongo
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: uptime_robot
+
+volumes:
+  mongodb_data:
