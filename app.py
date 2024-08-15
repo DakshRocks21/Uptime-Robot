@@ -1,24 +1,14 @@
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, jsonify, Response, flash
+from flask import Flask, render_template, request, redirect, url_for, Response, flash, abort, session
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_bcrypt import Bcrypt
 from pymongo import MongoClient
-import datetime
-import uuid
-import requests
-import json
-import socket
+from bson import ObjectId
 from apscheduler.schedulers.background import BackgroundScheduler
 from emails import EmailSender
 from dotenv import load_dotenv
-import os
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from flask_bcrypt import Bcrypt
-from bson import ObjectId
-import time
-from flask import abort
-import pyotp 
-import qrcode
-import io
-
+import datetime, uuid, requests, json, socket
+import os, time, io, pyotp, qrcode
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'  # Required for flash messages
@@ -26,6 +16,10 @@ app.secret_key = 'supersecretkey'  # Required for flash messages
 client = MongoClient('mongodb://localhost:27017/')
 db = client['uptime_robot']
 collection = db['services']
+
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_PROTECTION'] = 'strong'
 
 
 login_manager = LoginManager()
@@ -45,10 +39,8 @@ email_sender = EmailSender(
 )
 
 
-# Scheduler
 scheduler = BackgroundScheduler()
 
-import time  # Import the time module for measuring response time
 def check_service(service):
     url = service['url']
     port = service.get('port')  # Retrieve the port if it exists
@@ -120,6 +112,44 @@ def check_service(service):
     )
 
     print(f"Service {service['name_of_service']} checked. Status: {status}, Response Time: {response_time}ms")
+import io
+from flask import send_file
+
+@app.route('/qrcode')
+@login_required
+def generate_qrcode():
+    # Ensure that the user is in the process of setting up 2FA
+    if not current_user.two_factor_enabled:
+        otp_secret = current_user.otp_secret
+        if not otp_secret:
+            otp_secret = pyotp.random_base32()
+            user_collection.update_one(
+                {"_id": ObjectId(current_user.id)}, 
+                {"$set": {"otp_secret": otp_secret}}
+            )
+
+        totp = pyotp.TOTP(otp_secret)
+        qr_uri = totp.provisioning_uri(name=current_user.email, issuer_name="YourAppName")
+
+        # Generate the QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_uri)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Serve the QR code directly as an image response
+        buf = io.BytesIO()
+        img.save(buf)
+        buf.seek(0)
+        return send_file(buf, mimetype='image/png')
+
+    flash("2FA is already enabled or not in setup process.", "danger")
+    return redirect(url_for('dashboard'))
 
 @app.route('/2fa_setup')
 @login_required
@@ -164,25 +194,47 @@ def disable_2fa():
     flash("Two-Factor Authentication has been disabled.", "success")
     return redirect(url_for('settings'))
 
+from flask import flash, redirect, url_for, render_template
+import pyotp
+
 @app.route('/enable_2fa', methods=['POST'])
 @login_required
 def enable_2fa():
     otp_secret = request.form.get('otp_secret')
     otp = request.form.get('otp')
 
+    # Ensure the OTP is a 6-digit number
+    if not otp.isdigit() or len(otp) != 6:
+        flash("Invalid OTP format. Please enter a 6-digit code.", "danger")
+        return redirect(url_for('two_factor_setup'))
+
     totp = pyotp.TOTP(otp_secret)
+
+    # Verify the OTP entered by the user
+    if 'otp_attempts' not in session:
+        session['otp_attempts'] = 0
+        session['otp_last_attempt'] = time.time()
+
+    if session['otp_attempts'] >= 5 and time.time() - session['otp_last_attempt'] < 300:  # 5 attempts, 5-minute cooldown
+        flash("Too many attempts. Please wait a few minutes and try again.", "danger")
+        return redirect(url_for('two_factor_setup'))
+
     if totp.verify(otp):
-        # Enable 2FA after successful OTP verification
+        session.pop('otp_attempts', None)  # Reset the counter on success
+        session.pop('otp_last_attempt', None)
         user_collection.update_one({"_id": ObjectId(current_user.id)}, {"$set": {"two_factor_enabled": True, "otp_secret": otp_secret}})
-        flash("2FA has been enabled.", "success")
+        flash("Two-Factor Authentication has been enabled.", "success")
         return redirect(url_for('dashboard'))
     else:
+        session['otp_attempts'] += 1
+        session['otp_last_attempt'] = time.time()
         flash("Invalid OTP. Please try again.", "danger")
         return redirect(url_for('two_factor_setup'))
 
+
     
 class User(UserMixin):
-    def __init__(self, user_id, username, email, password_hash, is_admin=False, otp_secret=None, two_factor_enabled=False):
+    def __init__(self, user_id, username, email, password_hash, is_admin=False, otp_secret=None, two_factor_enabled=False, email_notifications=True):
         self.id = user_id
         self.username = username
         self.email = email
@@ -190,6 +242,7 @@ class User(UserMixin):
         self.is_admin = is_admin
         self.otp_secret = otp_secret or pyotp.random_base32()  # Generate a new secret if not provided
         self.two_factor_enabled = two_factor_enabled
+        self.email_notifications = email_notifications
 
     @staticmethod
     def get_user_by_id(user_id):
@@ -202,7 +255,9 @@ class User(UserMixin):
                 user_data['password_hash'],
                 user_data.get('is_admin', False),
                 user_data.get('otp_secret'),
-                user_data.get('two_factor_enabled', False)
+                user_data.get('two_factor_enabled', False),
+                user_data.get('email_notifications', True)
+                
             )
         return None
 
@@ -210,7 +265,16 @@ class User(UserMixin):
     def get_user_by_username(username):
         user_data = user_collection.find_one({"username": username})
         if user_data:
-            return User(str(user_data['_id']), user_data['username'], user_data['email'], user_data['password_hash'], user_data.get('is_admin', False))
+            return User(
+                str(user_data['_id']), 
+                user_data['username'], 
+                user_data['email'], 
+                user_data['password_hash'], 
+                user_data.get('is_admin', False),
+                user_data.get('otp_secret', None),
+                user_data.get('two_factor_enabled', False),
+                user_data.get('email_notifications', True)
+            )
         return None
 
 def admin_required(f):
@@ -226,7 +290,7 @@ def non_admin_required(f):
     @login_required
     def decorated_function(*args, **kwargs):
         if current_user.is_admin: 
-            flash('Welcome Admin!', 'info')
+            flash('Welcome Admin!', 'success')
             return redirect(url_for('admin'))  # Redirect admins to the dashboard or another page
         else:
             pass
@@ -259,7 +323,10 @@ def admin_add_user():
             "username": username,
             "email": email,
             "password_hash": hashed_password,
-            "is_admin": is_admin
+            "is_admin": is_admin,
+            "two_factor_enabled": False,
+            "otp_secret": None,
+            "email_notifications": True
         }
         user_collection.insert_one(user_data)
         flash('User added successfully!', 'success')
@@ -271,6 +338,10 @@ def admin_add_user():
 @app.route('/admin/user/edit/<user_id>', methods=['GET', 'POST'])
 @admin_required
 def admin_edit_user(user_id):
+    if user_id == str(current_user.id):
+        flash("You cannot edit your own account as an admin.", "danger")
+        return redirect(url_for('admin_users'))
+    
     user = user_collection.find_one({"_id": ObjectId(user_id)})
 
     if request.method == 'POST':
@@ -298,6 +369,10 @@ def admin_edit_user(user_id):
 @app.route('/admin/user/delete/<user_id>', methods=['POST'])
 @admin_required
 def admin_delete_user(user_id):
+    if user_id == str(current_user.id):
+        flash("You cannot delete your own account as an admin.", "danger")
+        return redirect(url_for('admin_users'))
+    
     user_collection.delete_one({"_id": ObjectId(user_id)})
     flash('User deleted successfully!', 'success')
     return redirect(url_for('admin_users'))
@@ -517,7 +592,7 @@ def login():
                 flash("Please complete your 2FA setup.", "info")
                 return redirect(url_for('two_factor_setup'))
             else:
-                flash("Logged in successfully!", "success")
+                flash("You are logged in. Consider enabling Two-Factor Authentication for added security.", "success")
                 return redirect(url_for('dashboard'))
         else:
             flash("Invalid email or password.", "danger")
@@ -542,8 +617,8 @@ def two_factor_verify():
     return render_template('2fa_verify.html')
 
 
-@app.route('/logout')
-@non_admin_required
+@app.route('/logout', methods=['GET','POST'])
+@login_required
 def logout():
     logout_user()
     flash('You have been logged out.', 'success')
