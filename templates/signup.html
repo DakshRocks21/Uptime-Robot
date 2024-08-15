@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% block title %}Sign Up{% endblock %}
+
 {% block content %}
 <div class="mx-auto mt-5 max-w-md">
     <h1 class="text-4xl font-bold mb-8 text-gray-800 text-center">Sign Up</h1>
@@ -21,6 +23,12 @@
             <input type="password" id="password" name="password"
                 class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Create a password" required>
+        </div>
+        <div class="mb-6 flex flex-row space-x-4 items-center justify-between">
+            <label class="block text-gray-700 font-semibold mb-2" for="enable_2fa">I want to enable Two-Factor
+                Authentication</label>
+            <input type="checkbox" id="enable_2fa" name="enable_2fa"
+                class="rounded text-blue-600 focus:ring-blue-500 inline-block">
         </div>
         <button type="submit"
             class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition duration-300 ease-in-out">Sign

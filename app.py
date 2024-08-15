@@ -15,7 +15,9 @@ from flask_bcrypt import Bcrypt
 from bson import ObjectId
 import time
 from flask import abort
-
+import pyotp 
+import qrcode
+import io
 
 
 app = Flask(__name__)
@@ -119,20 +121,89 @@ def check_service(service):
 
     print(f"Service {service['name_of_service']} checked. Status: {status}, Response Time: {response_time}ms")
 
- 
+@app.route('/2fa_setup')
+@login_required
+def two_factor_setup():
+    if current_user.two_factor_enabled:
+        flash("2FA is already enabled.", "info")
+        return redirect(url_for('dashboard'))
+
+    # Generate a new OTP secret
+    otp_secret = pyotp.random_base32()  # Always generate a new secret at this stage
+    totp = pyotp.TOTP(otp_secret)
+    qr_uri = totp.provisioning_uri(name=current_user.email, issuer_name="YourAppName")
+
+    # Generate QR code
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(qr_uri)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf)
+    buf.seek(0)
+
+    # Save QR code image in static files (or serve directly to the template)
+    with open(f"static/{current_user.username}_qrcode.png", "wb") as f:
+        img.save(f)
+        print(f"QR code saved as static/{current_user.username}_qrcode.png")
+
+    return render_template('2fa_setup.html', qr_code=f"/static/{current_user.username}_qrcode.png", otp_secret=otp_secret)
+
+@app.route('/disable_2fa', methods=['POST'])
+@login_required
+def disable_2fa():
+    user_collection.update_one(
+        {"_id": ObjectId(current_user.id)},
+        {"$set": {"two_factor_enabled": False, "otp_secret": None}}
+    )
+    flash("Two-Factor Authentication has been disabled.", "success")
+    return redirect(url_for('settings'))
+
+@app.route('/enable_2fa', methods=['POST'])
+@login_required
+def enable_2fa():
+    otp_secret = request.form.get('otp_secret')
+    otp = request.form.get('otp')
+
+    totp = pyotp.TOTP(otp_secret)
+    if totp.verify(otp):
+        # Enable 2FA after successful OTP verification
+        user_collection.update_one({"_id": ObjectId(current_user.id)}, {"$set": {"two_factor_enabled": True, "otp_secret": otp_secret}})
+        flash("2FA has been enabled.", "success")
+        return redirect(url_for('dashboard'))
+    else:
+        flash("Invalid OTP. Please try again.", "danger")
+        return redirect(url_for('two_factor_setup'))
+
+    
 class User(UserMixin):
-    def __init__(self, user_id, username, email, password_hash, is_admin=False):
+    def __init__(self, user_id, username, email, password_hash, is_admin=False, otp_secret=None, two_factor_enabled=False):
         self.id = user_id
         self.username = username
         self.email = email
         self.password_hash = password_hash
         self.is_admin = is_admin
+        self.otp_secret = otp_secret or pyotp.random_base32()  # Generate a new secret if not provided
+        self.two_factor_enabled = two_factor_enabled
 
     @staticmethod
     def get_user_by_id(user_id):
         user_data = user_collection.find_one({"_id": ObjectId(user_id)})
         if user_data:
-            return User(str(user_data['_id']), user_data['username'], user_data['email'], user_data['password_hash'], user_data.get('is_admin', False))
+            return User(
+                str(user_data['_id']),
+                user_data['username'],
+                user_data['email'],
+                user_data['password_hash'],
+                user_data.get('is_admin', False),
+                user_data.get('otp_secret'),
+                user_data.get('two_factor_enabled', False)
+            )
         return None
 
     @staticmethod
@@ -155,9 +226,10 @@ def non_admin_required(f):
     @login_required
     def decorated_function(*args, **kwargs):
         if current_user.is_admin: 
+            flash('Welcome Admin!', 'info')
             return redirect(url_for('admin'))  # Redirect admins to the dashboard or another page
         else:
-            flash('Admins are not allowed to access this page.', 'warning')
+            pass
         return f(*args, **kwargs)
     return decorated_function
 
@@ -365,7 +437,7 @@ def unauthorized_error(error):
 
 @app.route('/')
 def index():
-    if current_user.is_admin:
+    if current_user.is_authenticated and current_user.is_admin:
         return redirect(url_for('admin_users'))
     elif current_user.is_authenticated:
         return redirect(url_for('dashboard'))
@@ -376,14 +448,13 @@ def index():
 def dashboard():
     services = list(collection.find({"user_id": current_user.id}))  # Fetch only the services belonging to the logged-in user
     return render_template('dashboard.html', services=services)
-
-
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
         username = request.form['username']
         email = request.form['email']
         password = request.form['password']
+        wants_2fa = 'enable_2fa' in request.form  # Check if the user wants to enable 2FA
         hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
         
         # Check if username or email already exists
@@ -396,11 +467,22 @@ def signup():
             "username": username,
             "email": email,
             "password_hash": hashed_password,
-            "email_notifications": True 
+            "two_factor_enabled": False,  # 2FA is not enabled yet
+            "otp_secret": None,  # Will be generated in 2FA setup
+            "email_notifications": True,
+            "wants_2fa": wants_2fa  # Store the intent to enable 2FA
         }
         user_collection.insert_one(user_data)
         flash('Account created successfully! Please log in.', 'success')
-        return redirect(url_for('login'))
+
+        # Auto-login the user after signup and redirect to 2FA setup if they expressed interest
+        user = User.get_user_by_username(username)
+        login_user(user)
+
+        if wants_2fa:
+            return redirect(url_for('two_factor_setup'))
+
+        return redirect(url_for('dashboard'))
 
     return render_template('signup.html')
 
@@ -408,20 +490,57 @@ def signup():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        print(request.form)
         username = request.form['username']
         password = request.form['password']
-        user = User.get_user_by_username(username)
-
-        if user and bcrypt.check_password_hash(user.password_hash, password):
-            login_user(user)
-            flash('Logged in successfully!', 'success')
-            return redirect(url_for('index'))
+        
+        if '@' in username:
+            user_data = user_collection.find_one({"email": username})
         else:
-            print('Invalid username or password!')
-            flash('Invalid username or password!', 'danger')
+            user_data = user_collection.find_one({"username": username})
+        
 
+        if user_data and bcrypt.check_password_hash(user_data['password_hash'], password):
+            user = User(
+                user_id=user_data['_id'], 
+                username=user_data['username'], 
+                email=user_data['email'], 
+                password_hash=user_data['password_hash'], 
+                is_admin=user_data.get('is_admin', False),
+                otp_secret=user_data.get('otp_secret'),
+                two_factor_enabled=user_data.get('two_factor_enabled', False)
+            )
+
+            login_user(user)
+            if user.two_factor_enabled:
+                return redirect(url_for('two_factor_verify'))
+            elif user_data.get('wants_2fa', False):
+                flash("Please complete your 2FA setup.", "info")
+                return redirect(url_for('two_factor_setup'))
+            else:
+                flash("Logged in successfully!", "success")
+                return redirect(url_for('dashboard'))
+        else:
+            flash("Invalid email or password.", "danger")
+    
     return render_template('login.html')
+
+
+@app.route('/2fa_verify', methods=['GET', 'POST'])
+@login_required
+def two_factor_verify():
+    if request.method == 'POST':
+        otp = request.form['otp']
+        totp = pyotp.TOTP(current_user.otp_secret)
+
+        if totp.verify(otp):
+            flash("2FA verification successful!", "success")
+            return redirect(url_for('dashboard'))
+        else:
+            flash("Invalid OTP. Please try again.", "danger")
+            return redirect(url_for('two_factor_verify'))
+
+    return render_template('2fa_verify.html')
+
 
 @app.route('/logout')
 @non_admin_required
@@ -468,6 +587,7 @@ def events():
 
     # Fetch all events from all services within the time range
     services = collection.find({
+        "user_id": current_user.id,
         "results.time": {"$gte": start_time, "$lte": end_time}
     })
 
