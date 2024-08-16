@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, Response, flash, abort, session
+from flask import Flask, render_template, request, redirect, url_for, Response, flash, abort, session, send_file
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_bcrypt import Bcrypt
 from pymongo import MongoClient
@@ -9,6 +9,7 @@ from emails import EmailSender
 from dotenv import load_dotenv
 import datetime, uuid, requests, json, socket
 import os, time, io, pyotp, qrcode
+from celery_worker import make_celery
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'  # Required for flash messages
@@ -16,6 +17,11 @@ app.secret_key = 'supersecretkey'  # Required for flash messages
 client = MongoClient('mongodb://localhost:27017/')
 db = client['uptime_robot']
 collection = db['services']
+
+app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
+app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
+
+celery = make_celery(app)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -86,11 +92,12 @@ def check_service(service):
     if status == "DOWN":
         service['consecutive_downs'] += 1
         if service['consecutive_downs'] % 3 == 0:
-            send_downtime_alert(service)
-            send_webhook(service, status, response_time)
+            send_downtime_alert.delay(service)  # Run in the background
     else:
         if service['consecutive_downs'] > 0:
-            send_webhook(service, status, response_time)
+            send_webhook.delay(service, status, response_time)  # Run in the background
+        service['consecutive_downs'] = 0
+
         service['consecutive_downs'] = 0
 
     check_result = {
@@ -112,8 +119,14 @@ def check_service(service):
     )
 
     print(f"Service {service['name_of_service']} checked. Status: {status}, Response Time: {response_time}ms")
-import io
-from flask import send_file
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template('500.html'), 500
 
 @app.route('/qrcode')
 @login_required
@@ -456,6 +469,8 @@ def update_password():
     flash('Password updated successfully!', 'success')
     return redirect(url_for('settings'))
 
+
+@celery.task
 def send_downtime_alert(service):
     user = User.get_user_by_id(service['user_id'])
     
@@ -470,9 +485,10 @@ def send_downtime_alert(service):
             body=body
         )
 
-    send_webhook(service, "DOWN", None)  # Call the webhook to notify about the downtime
+    send_webhook.delay(service, "DOWN", None)  # Call the webhook to notify about the downtime
 
 
+@celery.task
 def send_webhook(service, status, response_time):
     if 'webhooks' in service and service['webhooks']:
         payload = {
@@ -493,6 +509,7 @@ def send_webhook(service, status, response_time):
                 print(f"Error sending webhook to {webhook_url} for {service['name_of_service']}: {e}")
     else:
         print(f"No webhooks configured for service {service['name_of_service']}")
+
 
 
 def run_checks():

@@ -14,8 +14,12 @@ services:
       - MONGO_URI=mongodb://mongo:27017/uptime_robot
       - EMAIL_USER=your_email@example.com
       - EMAIL_PASS=your_email_password
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
       - mongo
+      - redis
+      - celery_worker
 
   mongo:
     image: mongo:5.0
@@ -26,6 +30,25 @@ services:
       - "27017:27017"
     environment:
       MONGO_INITDB_DATABASE: uptime_robot
+
+  redis:
+    image: redis:6.2
+    container_name: uptime_robot_redis
+    ports:
+      - "6379:6379"
+
+  celery_worker:
+    build: .
+    container_name: uptime_robot_celery
+    command: celery -A app.celery worker --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - mongo
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
 
 volumes:
   mongodb_data:
