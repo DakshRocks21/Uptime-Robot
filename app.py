@@ -11,6 +11,7 @@ import datetime, uuid, requests, json, socket
 import os, time, io, pyotp, qrcode
 from celery_worker import make_celery
 
+
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'  # Required for flash messages
 
@@ -207,8 +208,6 @@ def disable_2fa():
     flash("Two-Factor Authentication has been disabled.", "success")
     return redirect(url_for('settings'))
 
-from flask import flash, redirect, url_for, render_template
-import pyotp
 
 @app.route('/enable_2fa', methods=['POST'])
 @login_required
@@ -245,9 +244,8 @@ def enable_2fa():
         return redirect(url_for('two_factor_setup'))
 
 
-    
 class User(UserMixin):
-    def __init__(self, user_id, username, email, password_hash, is_admin=False, otp_secret=None, two_factor_enabled=False, email_notifications=True):
+    def __init__(self, user_id, username, email, password_hash, is_admin=False, otp_secret=None, two_factor_enabled=False, email_notifications=True, is_approved=False):
         self.id = user_id
         self.username = username
         self.email = email
@@ -256,6 +254,7 @@ class User(UserMixin):
         self.otp_secret = otp_secret or pyotp.random_base32()  # Generate a new secret if not provided
         self.two_factor_enabled = two_factor_enabled
         self.email_notifications = email_notifications
+        self.is_approved = is_approved
 
     @staticmethod
     def get_user_by_id(user_id):
@@ -269,10 +268,11 @@ class User(UserMixin):
                 user_data.get('is_admin', False),
                 user_data.get('otp_secret'),
                 user_data.get('two_factor_enabled', False),
-                user_data.get('email_notifications', True)
-                
+                user_data.get('email_notifications', True),
+                user_data.get('is_approved', False)
             )
         return None
+
 
     @staticmethod
     def get_user_by_username(username):
@@ -286,7 +286,8 @@ class User(UserMixin):
                 user_data.get('is_admin', False),
                 user_data.get('otp_secret', None),
                 user_data.get('two_factor_enabled', False),
-                user_data.get('email_notifications', True)
+                user_data.get('email_notifications', True),
+                user_data.get('is_approved', False)
             )
         return None
 
@@ -379,16 +380,38 @@ def admin_edit_user(user_id):
 
     return render_template('admin_edit_user.html', user=user)
 
-@app.route('/admin/user/delete/<user_id>', methods=['POST'])
+@app.route('/admin/user/<action>/<user_id>', methods=['POST'])
 @admin_required
-def admin_delete_user(user_id):
+def admin_user_action(action, user_id):
     if user_id == str(current_user.id):
-        flash("You cannot delete your own account as an admin.", "danger")
+        flash("You cannot modify your own account as an admin.", "danger")
         return redirect(url_for('admin_users'))
+
+    if action == 'approve':
+        user = user_collection.find_one({"_id": ObjectId(user_id)})
+        if user:
+            user_collection.update_one({"_id": ObjectId(user_id)}, {"$set": {"is_approved": True}})
+            
+            if user.get('email_notifications', True):
+                subject = "Your Account Has Been Approved!"
+                body = f"Hello {user['username']},\n\nYour account on Uptime Robot has been approved by an admin. You can now log in and access the platform.\n\nBest regards,\nUptime Robot Team"
+                email_sender.send_email(
+                    from_addr=os.getenv("EMAIL_USER"),
+                    to_addrs=[user['email']],
+                    subject=subject,
+                    body=body
+                )
+            flash('User approved successfully!', 'success')
     
-    user_collection.delete_one({"_id": ObjectId(user_id)})
-    flash('User deleted successfully!', 'success')
+    elif action == 'delete':
+        user_collection.delete_one({"_id": ObjectId(user_id)})
+        flash('User deleted successfully!', 'success')
+
+    else:
+        flash('Invalid action.', 'danger')
+
     return redirect(url_for('admin_users'))
+
 
 
 @app.route('/admin/server_settings', methods=['GET', 'POST'])
@@ -540,6 +563,7 @@ def index():
 def dashboard():
     services = list(collection.find({"user_id": current_user.id}))  # Fetch only the services belonging to the logged-in user
     return render_template('dashboard.html', services=services)
+
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
@@ -562,19 +586,12 @@ def signup():
             "two_factor_enabled": False,  # 2FA is not enabled yet
             "otp_secret": None,  # Will be generated in 2FA setup
             "email_notifications": True,
+            "is_approved": False,  # User must wait for approval
             "wants_2fa": wants_2fa  # Store the intent to enable 2FA
         }
         user_collection.insert_one(user_data)
-        flash('Account created successfully! Please log in.', 'success')
-
-        # Auto-login the user after signup and redirect to 2FA setup if they expressed interest
-        user = User.get_user_by_username(username)
-        login_user(user)
-
-        if wants_2fa:
-            return redirect(url_for('two_factor_setup'))
-
-        return redirect(url_for('dashboard'))
+        flash('Account created successfully! Please wait for admin approval.', 'success')
+        return redirect(url_for('login'))
 
     return render_template('signup.html')
 
@@ -589,9 +606,12 @@ def login():
             user_data = user_collection.find_one({"email": username})
         else:
             user_data = user_collection.find_one({"username": username})
-        
 
         if user_data and bcrypt.check_password_hash(user_data['password_hash'], password):
+            if not user_data.get('is_approved', False):
+                flash("Your account is pending approval. Please wait for an admin to approve your account.", "warning")
+                return redirect(url_for('login'))
+            
             user = User(
                 user_id=user_data['_id'], 
                 username=user_data['username'], 
